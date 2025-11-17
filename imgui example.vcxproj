@@ -156,7 +156,7 @@
     <None Include="readme.md" />
   </ItemGroup>
   <ItemGroup>
-    <Image Include="assetes\logo.png" />
+    <Image Include="assets\logo.png" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

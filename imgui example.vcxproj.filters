@@ -80,7 +80,7 @@
     <None Include="license.TXT" />
   </ItemGroup>
   <ItemGroup>
-    <Image Include="assetes\logo.png">
+    <Image Include="assets\logo.png">
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>
