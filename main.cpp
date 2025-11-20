@@ -12,8 +12,8 @@ void gui_render() {
     // render watermarks here 
 	auto draw = ImGui::GetForegroundDrawList();
 	c_draw drawing(draw);
-	drawing.outlined_text(fonts::main, 20.0f, ImVec2(10, 10), ImColor(255, 255, 255, 200), settings::PRODUCT_NAME);
-	drawing.outlined_text(fonts::main, 20.0f, ImVec2(10, 30), ImColor(255, 255, 255, 200), ("FPS: " + std::to_string((int)ImGui::GetIO().Framerate)).c_str());
+	drawing.draw_outlined_text(fonts::main, 20.0f, ImVec2(10, 10), ImColor(255, 255, 255, 200), settings::PRODUCT_NAME);
+	drawing.draw_outlined_text(fonts::main, 20.0f, ImVec2(10, 30), ImColor(255, 255, 255, 200), ("FPS: " + std::to_string((int)ImGui::GetIO().Framerate)).c_str());
     
     // render menu here
     if (settings::show_menu) {
@@ -28,16 +28,16 @@ void gui_render() {
         draw->AddRectFilled(pos, ImVec2(pos.x - 5 + size.x, pos.y + 51), ImColor(24, 24, 24), 9.0f, ImDrawFlags_RoundCornersTop);
         draw->AddRectFilledMultiColorRounded(pos, ImVec2(pos.x + 55, pos.y + 51), ImColor(1.0f, 1.0f, 1.0f, 0.00f), ImColor(1.0f, 1.0f, 1.0f, 0.05f), ImColor(1.0f, 1.0f, 1.0f, 0.00f), ImColor(1.0f, 1.0f, 1.0f, 0.00f), ImColor(1.0f, 1.0f, 1.0f, 0.05f), 9.0f, ImDrawFlags_RoundCornersTopLeft);
 
-        draw->AddText(fonts::main_bold, 17.0f, ImVec2(pos.x + ImGui::CalcTextSize(settings::PRODUCT_NAME).x - 60, pos.y + 18), ImColor(192, 203, 229), settings::PRODUCT_NAME);
+        draw->AddText(fonts::main2, 17.0f, ImVec2(pos.x + ImGui::CalcTextSize(settings::PRODUCT_NAME).x - 60, pos.y + 18), ImColor(192, 203, 229), settings::PRODUCT_NAME);
 
         ImGui::SetCursorPos({ 125, 20 });
 
         ImGui::BeginGroup(); {
-            if (c_widgets::tab("Features", settings::current_tab == 0)) settings::current_tab = 0;
+            if (widgets::tab("Features", settings::current_tab == 0)) settings::current_tab = 0;
             ImGui::SameLine();
-            if (c_widgets::tab("Info", settings::current_tab == 1)) settings::current_tab = 1;
+            if (widgets::tab("Info", settings::current_tab == 1)) settings::current_tab = 1;
             ImGui::SameLine();
-            if (c_widgets::tab("Settings", settings::current_tab == 2)) settings::current_tab = 2;
+            if (widgets::tab("Settings", settings::current_tab == 2)) settings::current_tab = 2;
         }
         ImGui::EndGroup();
 
@@ -46,7 +46,7 @@ void gui_render() {
         ImGui::BeginChild("##container", ImVec2(190, 275), false, ImGuiWindowFlags_NoScrollbar); {
 
             if (settings::current_tab == 0) {
-                c_widgets::progress_circle("progress1", settings::slider_val / 100.f, ImVec2(pos.x + 120, pos.y + 220), 40.f, IM_COL32(100, 170, 255, 255), 6.f);
+                widgets::progresscircle("progress1", settings::slider_val / 100.f, ImVec2(pos.x + 120, pos.y + 220), 40.f, IM_COL32(100, 170, 255, 255), 6.f);
                 draw->AddText(fonts::main, 14.0f, ImVec2(pos.x + 25, pos.y + 60), ImColor(1.0f, 1.0f, 1.0f, 0.6f), "Tab header 1");
                 ImGui::Checkbox("Option 1", &settings::option_1);
                 ImGui::SliderFloat("Progress Bar", &settings::slider_val, 0.f, 100.f);
@@ -75,7 +75,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     ImGui::CreateContext();
 
     window::init();
-    window::create(hInst);
+    window::create_window(hInst);
 
     ImGui_ImplWin32_Init(window:: hwnd);
     ImGui_ImplDX11_Init(window::device, window::context);
@@ -90,17 +90,26 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         if (GetAsyncKeyState(VK_END) & 1) { exit(0); }
         if (GetAsyncKeyState(VK_INSERT) & 1) settings::show_menu = !settings::show_menu;
 
-		window::begin_frame();
+        ImGui_ImplDX11_NewFrame();
+        ImGui_ImplWin32_NewFrame();
+        ImGui::NewFrame();
 
         gui_render();
 
-		window::render_frame();
+        ImGui::Render();
 
-        window::end_frame();
+        const float clear_color[4] = { 0.f,0.f,0.f,0.f };
+        window::context->OMSetRenderTargets(1, &window::rtv, nullptr);
+        window::context->ClearRenderTargetView(window::rtv, clear_color);
+        ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+        window::swapchain->Present(0, 0);
     }
 
-
-    window::destroy();
-  
+    ImGui_ImplDX11_Shutdown();
+    ImGui_ImplWin32_Shutdown();
+    ImGui::DestroyContext();
+    window::cleanup();
+    DestroyWindow(window::hwnd);
+    UnregisterClass(window::wc.lpszClassName, hInst);
     return 0;
 }

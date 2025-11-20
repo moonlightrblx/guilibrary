@@ -4,9 +4,8 @@
 #include <map>
 #include <string>
 #include <cmath>
-#include <cstdio>
-#include <d3d11.h>
-#include <dxgi.h>
+#include <cstdio>       
+
 #include "../imgui/imgui.h"
 #include "../imgui/imgui_impl_win32.h"
 #include "../imgui/imgui_impl_dx11.h"
@@ -20,60 +19,39 @@ extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM wparam
 inline ImVec2 operator+(const ImVec2& a, const ImVec2& b) { return ImVec2(a.x + b.x, a.y + b.y); }
 inline ImVec2 operator-(const ImVec2& a, const ImVec2& b) { return ImVec2(a.x - b.x, a.y - b.y); }
 inline ImVec2 operator*(const ImVec2& a, float f) { return ImVec2(a.x * f, a.y * f); }
-inline ImVec2 operator*(float f, const ImVec2& a) { return ImVec2(f * a.x, f * a.y); }
+inline ImVec2 operator*(float f, const ImVec2& a) { return ImVec2(a.x * f, a.y * f); }
 
 namespace fonts {
     inline ImFont* main = nullptr;
-    inline ImFont* main_bold = nullptr;
+    inline ImFont* main2 = nullptr;
 }
-
 namespace utils {
     std::string getrandomstring(int length = 64) {
-        static const char charset[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        static const char charset[] =
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            "abcdefghijklmnopqrstuvwxyz"
+            "0123456789";
+
         std::random_device rd;
         std::mt19937 gen(rd());
         std::uniform_int_distribution<> dist(0, sizeof(charset) - 2);
+
         std::string str;
         str.reserve(length);
-        for (int i = 0; i < length; ++i)
+        for (int i = 0; i < length; i++)
             str.push_back(charset[dist(gen)]);
+
         return str;
     }
 }
-
 namespace window {
-    IDXGISwapChain* swapchain = nullptr;
-    ID3D11Device* device = nullptr;
-    ID3D11DeviceContext* context = nullptr;
-    ID3D11RenderTargetView* rtv = nullptr;
-    HWND hwnd = nullptr;
-    WNDCLASSEXW wc{};
-
-    void begin_frame() {
-        ImGui_ImplDX11_NewFrame();
-        ImGui_ImplWin32_NewFrame();
-        ImGui::NewFrame();
-	}
-    void render_frame() {
-        ImGui::Render();
-        const float clear_color[4] = { 0.f, 0.f, 0.f, 0.f };
-        context->OMSetRenderTargets(1, &rtv, nullptr);
-        context->ClearRenderTargetView(rtv, clear_color);
-        ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
-        swapchain->Present(1, 0);
-    }
-    void end_frame() {
-		// honestly just used for style consistency
-        // will actually need this when i use a custom engine
-	}
-    void destroy() {
-        ImGui_ImplDX11_Shutdown();
-        ImGui_ImplWin32_Shutdown();
-        ImGui::DestroyContext();
-        cleanup();
-        DestroyWindow(hwnd);
-        UnregisterClassW(wc.lpszClassName, wc.hInstance);
-	}
+    IDXGISwapChain* swapchain;
+    ID3D11Device* device;
+    ID3D11DeviceContext* context;
+    ID3D11RenderTargetView* rtv;
+    
+    HWND hwnd;
+    WNDCLASSEXW wc;
 
     void cleanup() {
         if (rtv) rtv->Release();
@@ -83,10 +61,10 @@ namespace window {
     }
 
     bool create_device(HWND hwnd) {
-        DXGI_SWAP_CHAIN_DESC sd{};
+        DXGI_SWAP_CHAIN_DESC sd = {};
         sd.BufferCount = 2;
         sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-        sd.BufferDesc.RefreshRate.Numerator = 0;
+        sd.BufferDesc.RefreshRate.Numerator = 500; // 500 fps
         sd.BufferDesc.RefreshRate.Denominator = 1;
         sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
         sd.OutputWindow = hwnd;
@@ -97,7 +75,6 @@ namespace window {
         if (FAILED(D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, 0, nullptr, 0,
             D3D11_SDK_VERSION, &sd, &swapchain, &device, nullptr, &context)))
             return false;
-
         ID3D11Texture2D* bb;
         swapchain->GetBuffer(0, IID_PPV_ARGS(&bb));
         device->CreateRenderTargetView(bb, nullptr, &rtv);
@@ -105,189 +82,240 @@ namespace window {
         return true;
     }
 
-    LRESULT WINAPI wnd_proc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-        if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam)) return true;
 
-        if (msg == WM_SIZE && device && wParam != SIZE_MINIMIZED) {
-            if (rtv) { rtv->Release(); rtv = nullptr; }
-            swapchain->ResizeBuffers(0, LOWORD(lParam), HIWORD(lParam), DXGI_FORMAT_UNKNOWN, 0);
-            ID3D11Texture2D* bb;
+    LRESULT WINAPI wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
+        if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam)) return true;
+        if (msg == WM_SIZE && device && wparam != SIZE_MINIMIZED) {
+            if (rtv) rtv->Release();
+            swapchain->ResizeBuffers(0, LOWORD(lparam), HIWORD(lparam), DXGI_FORMAT_UNKNOWN, 0);
+            ID3D11Texture2D* bb; 
             swapchain->GetBuffer(0, IID_PPV_ARGS(&bb));
-            device->CreateRenderTargetView(bb, nullptr, &rtv);
-            bb->Release();
+            device->CreateRenderTargetView(bb, nullptr, &rtv); bb->Release();
         }
         if (msg == WM_DESTROY) PostQuitMessage(0);
-        return DefWindowProc(hWnd, msg, wParam, lParam);
+        return DefWindowProc(hwnd, msg, wparam, lparam);
     }
 
     void init() {
-        ImGui::CreateContext();
-        ImGuiIO& io = ImGui::GetIO();
+        ImGuiIO& io = ImGui::GetIO();;
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-        io.IniFilename = nullptr;
+
+        ImFontConfig font_config;
+        font_config.PixelSnapH = false;
+        font_config.OversampleH = 5;
+        font_config.OversampleV = 5;
+        font_config.RasterizerMultiply = 1.2f;
+
+        static const ImWchar ranges[] =
+        {
+            0x0020, 0x00FF, // Basic Latin + Latin Supplement
+            0x0400, 0x052F, // Cyrillic + Cyrillic Supplement
+            0x2DE0, 0x2DFF, // Cyrillic Extended-A
+            0xA640, 0xA69F, // Cyrillic Extended-B
+            0xE000, 0xE226, // icons
+            0,
+        };
+
+        font_config.GlyphRanges = ranges;
+
+        fonts::main = io.Fonts->AddFontFromMemoryTTF(InterMedium, sizeof(InterMedium), 15.0f, &font_config, ranges);
+        fonts::main2 = io.Fonts->AddFontFromMemoryTTF(InterSemiBold, sizeof(InterSemiBold), 17.0f, &font_config, ranges);
+
+		io.IniFilename = nullptr;
         io.LogFilename = nullptr;
 
-        ImFontConfig cfg;
-        cfg.OversampleH = cfg.OversampleV = 5;
-        cfg.RasterizerMultiply = 1.2f;
-
-        static const ImWchar ranges[] = { 0x0020, 0x00FF, 0x0400, 0x052F, 0x2DE0, 0x2DFF, 0xA640, 0xA69F, 0xE000, 0xE226, 0 };
-
-        fonts::main = io.Fonts->AddFontFromMemoryTTF(InterMedium, sizeof(InterMedium), 15.0f, &cfg, ranges);
-        fonts::main_bold = io.Fonts->AddFontFromMemoryTTF(InterSemiBold, sizeof(InterSemiBold), 17.0f, &cfg, ranges);
-
         ImGuiStyle& style = ImGui::GetStyle();
-        style.WindowRounding = 6.f;
-        style.ChildRounding = 4.f;
+        style.WindowRounding = 6.f; 
+        style.ChildRounding = 4.f; 
         style.FrameRounding = 4.f;
         style.PopupRounding = 4.f;
         style.ScrollbarRounding = 4.f;
-        style.GrabRounding = 4.f;
+        style.GrabRounding = 4.f; 
         style.TabRounding = 4.f;
-        style.Alpha = 1.0f;
-
-        ImGui_ImplWin32_Init(hwnd);
-        ImGui_ImplDX11_Init(device, context);
     }
 
     void create(HINSTANCE hInst) {
         std::string rndClass = utils::getrandomstring();
         std::string rndTitle = utils::getrandomstring();
+
         std::wstring wClass(rndClass.begin(), rndClass.end());
         std::wstring wTitle(rndTitle.begin(), rndTitle.end());
 
-        wc = { sizeof(WNDCLASSEXW), CS_CLASSDC, wnd_proc, 0, 0, hInst, nullptr, nullptr, nullptr, nullptr, wClass.c_str(), nullptr };
-        RegisterClassExW(&wc);
+       wc = {
+            sizeof(WNDCLASSEXW),
+            CS_CLASSDC,
+            window::wnd_proc,
+            0, 0,
+            hInst,
+            nullptr, nullptr, nullptr, nullptr,
+            wClass.c_str(),
+            nullptr
+        };
 
+        RegisterClassEx(&wc);
         RECT rc; GetClientRect(GetDesktopWindow(), &rc);
-        hwnd = CreateWindowExW(WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW, wc.lpszClassName, wTitle.c_str(),
-            WS_POPUP, 0, 0, rc.right, rc.bottom, nullptr, nullptr, hInst, nullptr);
-
+        hwnd = CreateWindowExW(
+            WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
+            wc.lpszClassName,
+            wTitle.c_str(),
+            WS_POPUP,
+            0, 0,
+            rc.right, rc.bottom,
+            nullptr, nullptr,
+            wc.hInstance,
+            nullptr
+        );
+        SetWindowLong(hwnd, GWL_EXSTYLE, GetWindowLong(hwnd, GWL_EXSTYLE) | WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW);
         SetLayeredWindowAttributes(hwnd, RGB(0, 0, 0), 0, LWA_COLORKEY);
 
-        if (!create_device(hwnd)) {
-            cleanup();
-            return;
+        if (!window::create_device(hwnd)) 
+        { 
+            window::cleanup(); 
+            return; 
         }
-
-        ShowWindow(hwnd, SW_SHOW);
+        
+        ShowWindow(hwnd, SW_SHOWDEFAULT); 
         UpdateWindow(hwnd);
-        init();
+      
     }
 }
 
-class c_widgets {
-    struct anim_t {
-        float hover = 0.f;
-        float value = 0.f;
-    };
 
-    static inline std::map<ImGuiID, anim_t> anim;
-    static inline std::map<std::string, float> progress;
+struct tab_element {
+    float element_opacity;
+};
 
-    static float get_progress(const char* id, float duration = 0.25f, bool reset = false) {
+namespace widgets {
+    template<typename T>
+    constexpr T clamp(T v, T lo, T hi) noexcept { return v < lo ? lo : (v > hi ? hi : v); }
+
+    template<typename T>
+    constexpr T lerp(T a, T b, float t) noexcept { return a + (b - a) * t; }
+
+    inline float smoothstep(float e0, float e1, float x) noexcept {
+        x = clamp((x - e0) / (e1 - e0), 0.f, 1.f);
+        return x * x * (3.f - 2.f * x);
+    }
+
+    inline float ease_in_out(float t) noexcept {
+        return t < .5f ? 2.f * t * t : -1.f + (4.f - 2.f * t) * t;
+    }
+
+
+    inline void fmt(char* buf, size_t buf_size, const char* format, ...) {
+        va_list args;
+        va_start(args, format);
+        vsnprintf(buf, buf_size, format, args);
+        va_end(args);
+        buf[buf_size - 1] = '\0';
+    }
+
+
+    struct progressdata { std::string id; float current_frame = 0.f; };
+    static std::map <ImGuiID, tab_element> anim;
+    inline std::map<std::string, progressdata> animations;
+
+    inline float get_anim(const char* id, float duration = 0.25f, bool reset = false) {
         std::string sid = id;
-        if (reset || progress.find(sid) == progress.end())
-            progress[sid] = 0.f;
-        progress[sid] = ImMin(progress[sid] + ImGui::GetIO().DeltaTime, duration);
-        return progress[sid] / duration;
-    }
-
-public:
-    static bool tab(const char* name, bool selected) {
-        ImGuiWindow* window = ImGui::GetCurrentWindow();
-        if (window->SkipItems) return false;
-
-        ImGuiID id = window->GetID(name);
-        ImVec2 label_size = ImGui::CalcTextSize(name, nullptr, true);
-        ImVec2 pos = window->DC.CursorPos;
-        ImRect rect(pos, pos + ImVec2(label_size.x + 20, label_size.y + 16));
-
-        ImGui::ItemSize(rect, 0);
-        if (!ImGui::ItemAdd(rect, id)) return false;
-
-        bool hovered, held;
-        bool pressed = ImGui::ButtonBehavior(rect, id, &hovered, &held);
-
-        auto& a = anim[id];
-        float target = selected ? 1.0f : hovered ? 0.7f : 0.4f;
-        a.hover = ImLerp(a.hover, target, ImGui::GetIO().DeltaTime * 12.f);
-
-        ImU32 col = ImColor(1.0f, 1.0f, 1.0f, a.hover);
-
-        if (selected) {
-            window->DrawList->AddRectFilled(rect.Min - ImVec2(0, 4), rect.Max + ImVec2(0, 4), ImColor(100, 170, 255, 120), 4.0f);
-            window->DrawList->AddText(rect.Min + ImVec2(10, 6), IM_COL32(100, 170, 255, 255), name);
+        auto it = animations.find(sid);
+        if (it == animations.end() || reset) {
+            animations[sid] = { sid, 0.f };
+            it = animations.find(sid);
         }
-        else {
-            window->DrawList->AddText(rect.Min + ImVec2(10, 6), col, name);
-        }
-
-        return pressed;
+        progressdata& a = it->second;
+        float dt = ImGui::GetIO().DeltaTime;
+        a.current_frame = clamp(a.current_frame + dt, 0.f, duration);
+        return a.current_frame / duration;               // 0..1
     }
 
-    static bool subtab(const char* name, bool selected) {
-        ImGuiWindow* window = ImGui::GetCurrentWindow();
-        if (window->SkipItems) return false;
+    inline ImDrawList* dl() { return ImGui::GetWindowDrawList(); }
 
-        ImGuiID id = window->GetID(name);
-        ImVec2 pos = window->DC.CursorPos;
-        ImVec2 size = ImVec2(110, 34);
-        ImRect rect(pos, pos + size);
 
-        ImGui::ItemSize(size);
-        if (!ImGui::ItemAdd(rect, id)) return false;
+    inline void progresscircle(const char* id, float fraction,
+        const ImVec2& center, float radius,
+        ImU32 col = IM_COL32(100, 170, 255, 255),
+        float thickness = 4.f) {
+        fraction = clamp(fraction, 0.f, 1.f);
+        float t = get_anim(id, 0.3f);
+        float draw_frac = lerp(0.f, fraction, ease_in_out(t));
 
-        bool hovered, held;
-        bool pressed = ImGui::ButtonBehavior(rect, id, &hovered, &held);
-
-        auto& a = anim[id];
-        float target = selected ? 1.0f : hovered ? 0.8f : 0.5f;
-        a.hover = ImLerp(a.hover, target, ImGui::GetIO().DeltaTime * 14.f);
-
-        window->DrawList->AddRectFilled(rect.Min, rect.Max, ImColor(40, 40, 45, (int)(255 * a.hover)), 5.0f);
-        window->DrawList->AddText(rect.Min + ImVec2(12, 8), ImColor(255, 255, 255, (int)(255 * a.hover)), name);
-
-        return pressed;
-    }
-
-    static void progress_circle(const char* id, float fraction, const ImVec2& center, float radius, ImU32 col = IM_COL32(100, 170, 255, 255), float thickness = 4.5f) {
-        fraction = ImClamp(fraction, 0.f, 1.f);
-        float t = get_progress(id, 0.3f);
-        float draw_frac = ImLerp(0.f, fraction, t < 0.5f ? 2.f * t * t : -1.f + (4.f - 2.f * t) * t);
-
-        ImDrawList* draw = ImGui::GetWindowDrawList();
+        ImDrawList* draw = dl();
         const int segs = 64;
         const float a_max = draw_frac * IM_PI * 2.f;
 
         draw->PathClear();
         for (int i = 0; i <= segs; ++i) {
             float a = (i / (float)segs) * a_max;
-            draw->PathLineTo(center + ImVec2(cosf(a), sinf(a)) * radius);
+            draw->PathLineTo(ImVec2(center.x + cosf(a) * radius,
+                center.y + sinf(a) * radius));
         }
         draw->PathStroke(col, false, thickness);
     }
-};
+
+    inline bool tab(const char* name, bool boolean)
+    {
+        ImGuiWindow* window = ImGui::GetCurrentWindow();
+        if (window->SkipItems)
+            return false;
+
+        ImGuiContext& g = *GImGui;
+        const ImGuiStyle& style = g.Style;
+        const ImGuiID id = window->GetID(name);
+        const ImVec2 label_size = ImGui::CalcTextSize(name, NULL, true);
+        ImVec2 pos = window->DC.CursorPos;
+
+        const ImRect rect(pos, ImVec2(pos.x + label_size.x, pos.y + label_size.y));
+        ImGui::ItemSize(ImVec4(rect.Min.x, rect.Min.y, rect.Max.x + 10, rect.Max.y), style.FramePadding.y);
+        if (!ImGui::ItemAdd(rect, id))
+            return false;
+
+        bool hovered, held;
+        bool pressed = ImGui::ButtonBehavior(rect, id, &hovered, &held, NULL);
+
+
+        auto it_anim = anim.find(id);
+        if (it_anim == anim.end()) {
+            anim.insert({ id, { 0.0f } });
+            it_anim = anim.find(id);
+        }
+
+        it_anim->second.element_opacity = ImLerp(it_anim->second.element_opacity, (boolean ? 0.8f : hovered ? 0.6f : 0.4f), 0.07f * (1.0f - ImGui::GetIO().DeltaTime));
+
+        window->DrawList->AddText(rect.Min, ImColor(1.0f, 1.0f, 1.0f, it_anim->second.element_opacity), name);
+
+        return pressed;
+    }
+}
 
 class c_draw {
 public:
-    ImDrawList* draw = ImGui::GetWindowDrawList();
+	ImDrawList* draw;
+    c_draw(ImDrawList* draw_list) : draw(draw_list) {}
 
-    void outlined_text(ImFont* font, float size, ImVec2 pos, ImU32 color, const char* text) {
-        draw->AddText(font, size, pos + ImVec2(1, 1), IM_COL32(0, 0, 0, color >> 24), text);
-        draw->AddText(font, size, pos + ImVec2(-1, -1), IM_COL32(0, 0, 0, color >> 24), text);
-        draw->AddText(font, size, pos + ImVec2(1, -1), IM_COL32(0, 0, 0, color >> 24), text);
-        draw->AddText(font, size, pos + ImVec2(-1, 1), IM_COL32(0, 0, 0, color >> 24), text);
-        draw->AddText(font, size, pos, color, text);
+    __forceinline void draw_outlined_text(ImFont* font, float size, ImVec2 pos, ImColor color, const char* text){
+		draw->AddText(font, size, ImVec2(pos.x + 1, pos.y), IM_COL32(0, 0, 0, color.Value.w * 255), text);
+		draw->AddText(font, size, ImVec2(pos.x - 1, pos.y), IM_COL32(0, 0, 0, color.Value.w * 255), text);
+		draw->AddText(font, size, ImVec2(pos.x, pos.y + 1), IM_COL32(0, 0, 0, color.Value.w * 255), text);
+		draw->AddText(font, size, ImVec2(pos.x, pos.y - 1), IM_COL32(0, 0, 0, color.Value.w * 255), text);
+		draw->AddText(font, size, pos, color, text);
     }
 
-    void filled_rect(ImVec2 a, ImVec2 b, ImU32 col, float rounding = 0.f) {
-        draw->AddRectFilled(a, b, col, rounding);
-        draw->AddRect(a - ImVec2(1, 1), b + ImVec2(1, 1), IM_COL32(0, 0, 0, 150), rounding);
-        draw->AddRect(a - ImVec2(2, 2), b + ImVec2(2, 2), IM_COL32(0, 0, 0, 80), rounding);
-    }
+    __forceinline void draw_centered_text(ImFont* font, float size, ImVec2 pos, ImColor color, const char* text) {
+        ImVec2 text_size = font->CalcTextSizeA(size, FLT_MAX, 0.0f, text);
+        ImVec2 centered_pos = ImVec2(pos.x - text_size.x / 2.0f, pos.y);
+        draw->AddText(font, size, centered_pos, color, text);
+	}
 
-    void circle(ImVec2 center, float radius, ImU32 col, float thickness = 1.5f) {
-        draw->AddCircle(center, radius, col, 64, thickness);
+    __forceinline void draw_circle(ImVec2 center, float radius, ImU32 color, float thickness = 1.0f) {
+        const int segments = 100;
+        draw->AddCircle(center, radius, color, segments, thickness);
+	}
+
+    
+    __forceinline void draw_filled_rect(ImVec2 top_left, ImVec2 bottom_right, ImU32 color) {
+        draw->AddRectFilled(top_left, bottom_right, color);
+        draw->AddRect(top_left, bottom_right, IM_COL32(0, 0, 0, 255), 0.0f, 0, 1.0f);
+        draw->AddRect(top_left - ImVec2(1, 1), bottom_right + ImVec2(1, 1), IM_COL32(0, 0, 0, 150), 0.0f, 0, 1.0f);
+        draw->AddRect(top_left - ImVec2(2, 2), bottom_right + ImVec2(2, 2), IM_COL32(0, 0, 0, 100), 0.0f, 0, 1.0f);
     }
 };
