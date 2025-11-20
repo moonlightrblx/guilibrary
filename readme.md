@@ -18,7 +18,7 @@ It removes all boilerplate: window class setup, DX11 device creation, swapchains
 
 Just include the header(s), call the init functions, and render with your own ImGui code.
 
-A full rewrite that removes the ImGui dependency entirely is planned.
+A full rewrite that removes the ImGui dependency entirely is planned in the near future.
 
 ---
 
@@ -48,54 +48,38 @@ Below is a complete runnable example using Moonlight to create a DX11 window and
 
 ```cpp
 int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
+   
 
     ImGui::CreateContext();
 
     window::init();
-    window::create_window(hInst);
+    window::create(hInst);
 
-    ImGui_ImplWin32_Init(window::hwnd);
+    ImGui_ImplWin32_Init(window:: hwnd);
     ImGui_ImplDX11_Init(window::device, window::context);
 
     bool done = false;
     while (!done) {
         MSG msg;
         while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
-            TranslateMessage(&msg); 
-            DispatchMessage(&msg);
-            if (msg.message == WM_QUIT)
-                done = true;
+            TranslateMessage(&msg); DispatchMessage(&msg);
+            if (msg.message == WM_QUIT) done = true;
         }
+        if (GetAsyncKeyState(VK_END) & 1) { exit(0); }
+        if (GetAsyncKeyState(VK_INSERT) & 1) settings::show_menu = !settings::show_menu;
 
-        if (GetAsyncKeyState(VK_END) & 1)
-            exit(0);
+		window::begin_frame();
 
-        if (GetAsyncKeyState(VK_INSERT) & 1)
-            settings::show_menu = !settings::show_menu;
+        gui_render(); // your custom imgui rendering function
 
-        ImGui_ImplDX11_NewFrame();
-        ImGui_ImplWin32_NewFrame();
-        ImGui::NewFrame();
+		window::render_frame();
 
-        gui_render(); // your imgui rendering function
-
-        ImGui::Render();
-
-        const float clear_color[4] = { 0.f, 0.f, 0.f, 0.f };
-        window::context->OMSetRenderTargets(1, &window::rtv, nullptr);
-        window::context->ClearRenderTargetView(window::rtv, clear_color);
-        ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
-        window::swapchain->Present(0, 0);
+        window::end_frame();
     }
 
-    ImGui_ImplDX11_Shutdown();
-    ImGui_ImplWin32_Shutdown();
-    ImGui::DestroyContext();
 
-    window::cleanup();
-    DestroyWindow(window::hwnd);
-    UnregisterClass(window::wc.lpszClassName, hInst);
-
+    window::destroy();
+  
     return 0;
 }
 ```
