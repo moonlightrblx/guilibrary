@@ -46,10 +46,10 @@ void gui_render() {
         ImGui::BeginChild("##container", ImVec2(190, 275), false, ImGuiWindowFlags_NoScrollbar); {
 
             if (settings::current_tab == 0) {
-                widgets::progresscircle("progress1", settings::slider_val / 100.f, ImVec2(pos.x + 120, pos.y + 220), 40.f, IM_COL32(100, 170, 255, 255), 6.f);
+                widgets::progresscircle("progress1", settings::vars::slider_val / 100.f, ImVec2(pos.x + 120, pos.y + 220), 40.f, IM_COL32(100, 170, 255, 255), 6.f);
                 draw->AddText(fonts::main, 14.0f, ImVec2(pos.x + 25, pos.y + 60), ImColor(1.0f, 1.0f, 1.0f, 0.6f), "Tab header 1");
-                ImGui::Checkbox("Option 1", &settings::option_1);
-                ImGui::SliderFloat("Progress Bar", &settings::slider_val, 0.f, 100.f);
+                ImGui::Checkbox("Option 1", &settings::vars::option_1);
+                ImGui::SliderFloat("Progress Bar", &settings::vars::slider_val, 0.f, 100.f);
             }
             if (settings::current_tab == 1) {
                 draw->AddText(fonts::main, 14.0f, ImVec2(pos.x + 25, pos.y + 60), ImColor(1.0f, 1.0f, 1.0f, 0.6f), "Tab header 2");
@@ -75,7 +75,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     ImGui::CreateContext();
 
     window::init();
-    window::create_window(hInst);
+    window::create(hInst);
 
     ImGui_ImplWin32_Init(window:: hwnd);
     ImGui_ImplDX11_Init(window::device, window::context);
@@ -87,8 +87,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
             TranslateMessage(&msg); DispatchMessage(&msg);
             if (msg.message == WM_QUIT) done = true;
         }
-        if (GetAsyncKeyState(VK_END) & 1) { exit(0); }
-        if (GetAsyncKeyState(VK_INSERT) & 1) settings::show_menu = !settings::show_menu;
+        if (GetAsyncKeyState(settings::keys::_exit) & 1) { exit(0); }
+        if (GetAsyncKeyState(settings::keys::_menu) & 1) settings::show_menu = !settings::show_menu;
 
         ImGui_ImplDX11_NewFrame();
         ImGui_ImplWin32_NewFrame();
